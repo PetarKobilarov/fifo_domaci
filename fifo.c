@@ -9,7 +9,7 @@
 #include <linux/kdev_t.h>
 #include <linux/uaccess.h>
 #include <linux/errno.h>
-#define	BUFF_SIZE 20
+#define	BUFF_SIZE 176
 
 MODULE_LICENSE("Dual BSD/GPL");
 
@@ -18,9 +18,10 @@ static struct class *my_class;
 static struct device *my_device;
 static struct cdev *my_cdev;
 
-int fifo[10];
+int fifo[16];
 int pos = 0;
 int endRead = 0;
+int n = 1;
 
 int fifo_open(struct inode *pinode, struct file *pfile);
 int fifo_close(struct inode *pinode, struct file *pfile);
@@ -50,10 +51,9 @@ int fifo_close(struct inode *pinode, struct file *pfile)
 
 ssize_t fifo_read(struct file *pfile, char __user *buffer, size_t length, loff_t *offset)
 {
-	int ret, i = 0;
+	int ret, i = 0, j = 0;
 	char buff[BUFF_SIZE];
 	long int len = 0;
-
 	if(endRead)
 	{
 		endRead = 0;
@@ -62,32 +62,46 @@ ssize_t fifo_read(struct file *pfile, char __user *buffer, size_t length, loff_t
 
 	if(pos > 0)
 	{
-		len = scnprintf(buff, BUFF_SIZE, "%d ", fifo[0]);
-		ret = copy_to_user(buffer, buff, len);
+		if(n <= pos)
+		{
+			for(j = 0; j < n; j++)
+			{
+//				len = scnprintf(buff, BUFF_SIZE, "%d ", fifo[0]);
+				
+				buff[j] = fifo[0];
 
-		if(ret)
-			return -EFAULT;
-
-		printk(KERN_INFO "Succesfully read\n");
-
-		for(i = 0; i < pos; i++)
-			fifo[i] = fifo[i+1];
+				for(i = 0; i < pos; i++)
+ 					fifo[i] = fifo[i+1];
 		
-		pos--;
-		endRead = 1;
-	}else
-	{
-		printk(KERN_WARNING "Fifo is empty\n");
+			}
+			len = n;
+			pos -= n;
+				ret = copy_to_user(buffer, buff, len);
+				if(ret)
+					return -EFAULT;
+			printk(KERN_INFO "Succesfully read\n");
+			endRead = 1;
+		}else
+		{
+			printk(KERN_INFO "Not enough values in Fifo\n");
+			endRead = 1;
+		}
+//		endRead = 1;
 	}
-
+	else
+	{
+			printk(KERN_WARNING "Fifo is empty\n"); 
+	}
+	
 	return len;
 }
 
 ssize_t fifo_write(struct file *pfile, const char __user *buffer, size_t length, loff_t *offset)
 {
-	char buff[BUFF_SIZE];
-	int value;
+	char buff[BUFF_SIZE], binNums[16][8];
+	int value = 0;
 	int ret;
+	int i = 0, j = 0, k = 0;
 
 	ret = copy_from_user(buff, buffer, length);
 	if(ret)
@@ -95,21 +109,58 @@ ssize_t fifo_write(struct file *pfile, const char __user *buffer, size_t length,
 	
 	buff[length-1] = '\0';
 
-	if(pos < 10)
-	{
-		ret = sscanf(buff, "%d", &value);
-		if(ret == 1)
+	if(buff[0] == 'n' && buff[1] == 'u' && buff[2] == 'm' && buff[3] == '=')
 		{
-			printk(KERN_INFO "Succesfully wrote value %d", value);
-			fifo[pos] = value;
-			pos++;
-		}else
-		{
-			printk(KERN_WARNING "Wrong command format\n");
+
+			n = buff[4] - 48;
+			printk(KERN_INFO "Succesfully set to read %d numbers at once", n);
+			/*ret = sscanf(buff, "%d", &n);
+			if(ret == 1)
+				printk(KERN_INFO "Succesfully set to read %d numbers at once", n);
+			else
+				printk(KERN_WARNING "Wrong command format\n");*/
 		}
-	}else
+	
+	if(pos < 16)
 	{
-		printk(KERN_WARNING "Fifo is full\n");
+			for(i = 0; i < length-1; i++)
+			{
+				if(buff[i-1] == 'b')
+				{
+					for(k = 0; k < 8; k++)
+						binNums[j][k] = buff[i+k];
+
+					j++;
+				}
+			}
+
+			for(i = 0; i < j; i++)
+			{
+				if(binNums[i][7] == '1')
+					value += 1;
+				if(binNums[i][6] == '1')
+					value += 2;
+				if(binNums[i][5] == '1')
+					value += 4;
+				if(binNums[i][4] == '1')
+					value += 8;
+				if(binNums[i][3] == '1')
+					value += 16;
+				if(binNums[i][2] == '1')
+					value += 32;
+				if(binNums[i][1] == '1')
+					value += 64;
+				if(binNums[i][0] == '1')
+					value += 128;
+
+				printk(KERN_INFO "Succesfully wrote value %d\n", value);
+				fifo[pos] = value;
+				value = 0;
+				pos++;
+			}
+
+			
+		
 	}
 
 	return length;
