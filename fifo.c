@@ -19,7 +19,7 @@ static struct device *my_device;
 static struct cdev *my_cdev;
 
 int fifo[16];
-int pos = 0;
+int pos = 0, rep;
 int endRead = 0;
 int n = 1;
 
@@ -51,46 +51,51 @@ int fifo_close(struct inode *pinode, struct file *pfile)
 
 ssize_t fifo_read(struct file *pfile, char __user *buffer, size_t length, loff_t *offset)
 {
-	int ret, i = 0, j = 0;
+	int ret, i;
 	char buff[BUFF_SIZE];
-	long int len = 0;
+	long int len;
 	if(endRead)
 	{
 		endRead = 0;
+		rep = pos;	
+		printk(KERN_INFO "Succesfully read\n");
 		return 0;
 	}
 
 	if(pos > 0)
 	{
-		if(n <= pos)
+		if(n <= rep)
 		{
-			for(j = 0; j < n; j++)
-			{
-//				len = scnprintf(buff, BUFF_SIZE, "%d ", fifo[0]);
-				
-				buff[j] = fifo[0];
+			printk(KERN_INFO "n = %d\n", n);
+			len = scnprintf(buff, 32, "%d ", fifo[0]);
+			ret = copy_to_user(buffer, buff, len);
+			if(ret)
+				return -EFAULT;
 
-				for(i = 0; i < pos; i++)
- 					fifo[i] = fifo[i+1];
-		
-			}
-			len = n;
-			pos -= n;
-				ret = copy_to_user(buffer, buff, len);
-				if(ret)
-					return -EFAULT;
-			printk(KERN_INFO "Succesfully read\n");
-			endRead = 1;
+			pos--;
+
+			for(i = 0; i < pos; i++)
+				fifo[i] = fifo[i+1];
+
+			if(pos == rep-n)
+				endRead = 1;
+
+			return len;
+
 		}else
 		{
-			printk(KERN_INFO "Not enough values in Fifo\n");
-			endRead = 1;
+			
+			printk(KERN_WARNING "Not enough elements in Fifo\n");
+			rep = pos;
+			return 0;
 		}
-//		endRead = 1;
+		
 	}
 	else
 	{
 			printk(KERN_WARNING "Fifo is empty\n"); 
+			rep = pos;
+			return 0;
 	}
 	
 	return len;
@@ -110,17 +115,15 @@ ssize_t fifo_write(struct file *pfile, const char __user *buffer, size_t length,
 	buff[length-1] = '\0';
 
 	if(buff[0] == 'n' && buff[1] == 'u' && buff[2] == 'm' && buff[3] == '=')
-		{
+	{
 
-			n = buff[4] - 48;
+		ret = sscanf(buff, "num=%d", &n);
+		if(ret == 1)
 			printk(KERN_INFO "Succesfully set to read %d numbers at once", n);
-			/*ret = sscanf(buff, "%d", &n);
-			if(ret == 1)
-				printk(KERN_INFO "Succesfully set to read %d numbers at once", n);
-			else
-				printk(KERN_WARNING "Wrong command format\n");*/
-		}
-	
+		else
+			printk(KERN_WARNING "Wrong command format\n");
+	}else
+
 	if(pos < 16)
 	{
 			for(i = 0; i < length-1; i++)
@@ -163,6 +166,7 @@ ssize_t fifo_write(struct file *pfile, const char __user *buffer, size_t length,
 		
 	}
 
+	rep = pos;
 	return length;
 }
 
