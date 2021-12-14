@@ -9,7 +9,7 @@
 
 int pokaziMeni();
 int puniFifo();
-//void prazniFifo();
+int prazniFifo();
 
 void main(void)
 {
@@ -24,7 +24,7 @@ void main(void)
 					break;
 
 			case 2:
-//				prazniFifo();
+				prazniFifo();
 					break;
 
 			case 3:
@@ -141,7 +141,7 @@ int puniFifo()
 		strcat(echo, fifo[j]);
 
 	}
-	echo[(i-1)*10+1] = '\0';
+	echo[(i-1)*10+2] = '\0';
 	printf("\n%s", echo);
 	printf("\n");
 	fp = fopen("/dev/fifo", "w");
@@ -159,5 +159,57 @@ int puniFifo()
 		return -1;
 	}
 	
+	return 0;
+}
+
+int prazniFifo()
+{
+	FILE *fp;
+	int n = 1, i;
+	char *cat;
+
+	printf("\nKoliko brojeva zelite da citate: ");
+	do
+	{
+		scanf("%d", &n);
+	}while(n < 1 && n > 16);
+
+	if(n > 1)
+	{
+		fp = fopen("/dev/fifo", "w");
+		if(fp == NULL)
+		{
+			puts("Problem pri otvaranju /dev/fifo");
+			return -1;
+		}
+
+		fprintf(fp, "num=%d", n);//ovde ne radi, ne salje komandu kako treba
+
+		if(fclose(fp))
+		{
+			puts("Problem pri zatvaranju /dev/fifo");
+			return -1;
+		}
+	}
+
+	fp = fopen("/dev/fifo", "r");
+	if(fp == NULL)
+	{
+		puts("Problem pri otvaranju /dev/fifo");
+		return -1;
+	}
+
+	cat = (char *)malloc(180);
+	getline(&cat, &n, fp);
+
+	if(fclose(fp))
+	{
+		puts("Problem pri zatvaranju /dev/fifo");
+		return -1;
+	}
+
+	printf("%s \n", cat);
+
+
 	return 0;
 }
