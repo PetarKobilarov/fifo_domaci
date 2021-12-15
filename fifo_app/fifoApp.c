@@ -38,7 +38,7 @@ int pokaziMeni()
 {
 	int opcija = 0;
 
-	printf("1: Upisi u FIFO bafer\n2:Procitaj iz FIFO bafera\n3:Izadji\n");
+	printf("\n\n\n1:Upisi u FIFO bafer\n2:Procitaj iz FIFO bafera\n3:Izadji\n");
 	do
 	{
 		scanf("%d", &opcija);
@@ -141,7 +141,8 @@ int puniFifo()
 		strcat(echo, fifo[j]);
 
 	}
-	echo[(i-1)*10+2] = '\0';
+	strcat(echo, " ");
+//	echo[(i-1)*10+20] = '\0';
 	printf("\n%s", echo);
 	printf("\n");
 	fp = fopen("/dev/fifo", "w");
@@ -159,14 +160,16 @@ int puniFifo()
 		return -1;
 	}
 	
+	free(echo);
 	return 0;
 }
 
 int prazniFifo()
 {
 	FILE *fp;
-	int n = 1, i;
+	int n = 1, i, fifo[16];
 	char *cat;
+	size_t nB = 180;
 
 	printf("\nKoliko brojeva zelite da citate: ");
 	do
@@ -174,23 +177,21 @@ int prazniFifo()
 		scanf("%d", &n);
 	}while(n < 1 && n > 16);
 
-	if(n > 1)
+	fp = fopen("/dev/fifo", "w");
+	if(fp == NULL)
 	{
-		fp = fopen("/dev/fifo", "w");
-		if(fp == NULL)
-		{
-			puts("Problem pri otvaranju /dev/fifo");
-			return -1;
-		}
-
-		fprintf(fp, "num=%d", n);//ovde ne radi, ne salje komandu kako treba
-
-		if(fclose(fp))
-		{
-			puts("Problem pri zatvaranju /dev/fifo");
-			return -1;
-		}
+		puts("Problem pri otvaranju /dev/fifo");
+		return -1;
 	}
+
+	fprintf(fp, "num=%d ", n);
+
+	if(fclose(fp))
+	{
+		puts("Problem pri zatvaranju /dev/fifo");
+		return -1;
+	}
+	
 
 	fp = fopen("/dev/fifo", "r");
 	if(fp == NULL)
@@ -199,8 +200,8 @@ int prazniFifo()
 		return -1;
 	}
 
-	cat = (char *)malloc(180);
-	getline(&cat, &n, fp);
+	cat = (char *)malloc(nB);
+	getline(&cat, &nB, fp);
 
 	if(fclose(fp))
 	{
@@ -209,6 +210,7 @@ int prazniFifo()
 	}
 
 	printf("%s \n", cat);
+	free(cat);
 
 
 	return 0;

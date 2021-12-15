@@ -66,7 +66,6 @@ ssize_t fifo_read(struct file *pfile, char __user *buffer, size_t length, loff_t
 	{
 		if(n <= rep)
 		{
-			printk(KERN_INFO "n = %d\n", n);
 			len = scnprintf(buff, 32, "%d ", fifo[0]);
 			ret = copy_to_user(buffer, buff, len);
 			if(ret)
